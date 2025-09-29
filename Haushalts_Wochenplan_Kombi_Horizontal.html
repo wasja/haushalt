@@ -1,0 +1,164 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haushalts-Wochenplan – Horizontale Woche</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 10px; }
+  p { text-align: center; margin-bottom: 20px; }
+  .header-row { position: sticky; top: 0; background: #fff; z-index: 1000;
+                display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;
+                padding: 10px; border-bottom: 2px solid #4CAF50; }
+  .name { background: #ffe0b2; padding: 10px 15px; border-radius: 6px; cursor: pointer;
+          font-weight: bold; text-align: center; min-width: 70px; }
+  .scroll-board { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
+  .column { background: #ffffff; border-radius: 10px; padding: 10px; width: 220px; flex: 0 0 auto; }
+  .column h2 { text-align: center; background: #4CAF50; color: white; padding: 5px; border-radius: 6px;
+               font-size: 16px; margin: 0 0 10px 0; }
+  .task { background: #e3f2fd; margin: 5px 0; padding: 10px; border-radius: 6px;
+          text-align: center; position: relative; cursor: pointer; }
+  .assignment { font-size: 12px; color: #333; margin-top: 4px; background: #fff3cd;
+                border-radius: 4px; padding: 2px 5px; display: inline-block; }
+  .remove-btn { margin-left: 5px; color: red; cursor: pointer; font-weight: bold; }
+  .selected { outline: 3px solid #ff9800; }
+  .dragging { opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<h1>Haushalts-Wochenplan – Horizontale Ansicht</h1>
+<p>💻 Desktop: Ziehen & Ablegen | 📱 Mobil: Tippe zuerst auf eine <b>Person</b>, dann auf eine <b>Aufgabe</b>.<br>
+Tippe auf ❌, um eine Person wieder zu entfernen.</p>
+
+<div class="header-row" id="Personen"></div>
+
+<div class="scroll-board" id="Board">
+  <div class="column" id="Ablage"><h2>🗂 Ablage</h2></div>
+  <div class="column" id="Montag"><h2>Montag</h2></div>
+  <div class="column" id="Dienstag"><h2>Dienstag</h2></div>
+  <div class="column" id="Mittwoch"><h2>Mittwoch</h2></div>
+  <div class="column" id="Donnerstag"><h2>Donnerstag</h2></div>
+  <div class="column" id="Freitag"><h2>Freitag</h2></div>
+  <div class="column" id="Samstag"><h2>Samstag</h2></div>
+  <div class="column" id="Sonntag"><h2>Sonntag</h2></div>
+</div>
+
+<script>
+const personen = ["Lisa", "Wasja", "Hanna", "Ella"];
+const aufgaben = [
+  "Geschirrspüler ausräumen",
+  "Staubsaugen Wohnzimmer",
+  "Bad putzen",
+  "Müll rausbringen",
+  "Wäsche zusammenlegen",
+  "Einkaufsliste schreiben",
+  "Boden wischen Küche",
+  "Staub wischen",
+  "Fenster putzen",
+  "Bettwäsche wechseln",
+  "Kühlschrank auswischen",
+  "Familien-Einkauf",
+  "Gartenarbeit",
+  "Bücherregal aufräumen",
+  "Familien-Aufräumrunde",
+  "Spieleabend vorbereiten",
+  "Zimmer gründlich saugen"
+];
+
+const personenRow = document.getElementById('Personen');
+personen.forEach(name => {
+  const div = document.createElement('div');
+  div.className = 'name';
+  div.textContent = name;
+  div.draggable = true;
+  div.addEventListener('click', () => selectPerson(div));
+  addDragEvents(div);
+  personenRow.appendChild(div);
+});
+
+const ablage = document.getElementById('Ablage');
+aufgaben.forEach(a => {
+  const div = document.createElement('div');
+  div.className = 'task';
+  div.textContent = a;
+  div.draggable = true;
+  div.addEventListener('click', () => assignPerson(div));
+  addDragEvents(div);
+  ablage.appendChild(div);
+});
+
+let selectedPerson = null;
+
+function selectPerson(element){
+  if (selectedPerson === element){
+    element.classList.remove('selected');
+    selectedPerson = null;
+  } else {
+    if (selectedPerson) selectedPerson.classList.remove('selected');
+    element.classList.add('selected');
+    selectedPerson = element;
+  }
+}
+
+function assignPerson(taskEl){
+  if (!selectedPerson) return;
+  const assign = document.createElement('span');
+  assign.className = 'assignment';
+  assign.textContent = "→ " + selectedPerson.textContent;
+  const removeBtn = document.createElement('span');
+  removeBtn.className = 'remove-btn';
+  removeBtn.textContent = '❌';
+  removeBtn.addEventListener('click', () => assign.remove());
+  assign.appendChild(removeBtn);
+  taskEl.appendChild(assign);
+}
+
+function addDragEvents(el){
+  el.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', el.textContent);
+    e.dataTransfer.setData('type', el.classList.contains('name') ? 'name' : 'task');
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+}
+
+document.querySelectorAll('.column').forEach(column => {
+  column.addEventListener('dragover', e => e.preventDefault());
+  column.addEventListener('drop', e => {
+    e.preventDefault();
+    const dragging = document.querySelector('.dragging');
+    if (dragging && !dragging.classList.contains('name')){
+      column.appendChild(dragging);
+    }
+  });
+});
+
+// Drag auf Aufgaben für Desktop-Zuordnung von Namen
+document.addEventListener('dragover', e => {
+  const target = e.target.closest('.task');
+  if (target) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+  const target = e.target.closest('.task');
+  if (target){
+    const dragged = document.querySelector('.dragging');
+    if (dragged && dragged.classList.contains('name')){
+      const assign = document.createElement('span');
+      assign.className = 'assignment';
+      assign.textContent = "→ " + dragged.textContent;
+      const removeBtn = document.createElement('span');
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = '❌';
+      removeBtn.addEventListener('click', () => assign.remove());
+      assign.appendChild(removeBtn);
+      target.appendChild(assign);
+    }
+  }
+});
+</script>
+
+</body>
+</html>
