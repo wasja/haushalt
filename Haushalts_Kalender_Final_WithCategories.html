@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Haushaltskalender — Komplett mit Kategorien</title>
+  <style>
+    :root{
+      --green:#43a047; --blue:#1e88e5; --red:#e53935; --purple:#8e24aa;
+      --sidebar:#2196F3; --task:#64B5F6; --card-bg:#ffffff; --today:#d9fdd3;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f5f5f5}
+    header{position:fixed;top:0;left:0;right:0;background:#4CAF50;color:#fff;padding:10px;display:flex;align-items:center;justify-content:center;z-index:300}
+    header h1{margin:0;font-size:1.1rem;flex:1;text-align:center}
+    .left-controls{position:absolute;left:10px;display:flex;gap:8px}
+    .header-btn{background:#fff;color:#4CAF50;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700}
+    .person-bar-wrap{margin-top:54px}
+    #person-bar{background:var(--card-bg);padding:10px;display:flex;justify-content:center;gap:10px;position:sticky;top:50px;z-index:200}
+    .person{padding:8px 14px;border-radius:12px;color:#fff;font-weight:700;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.12)}
+    .person.selected{outline:3px solid rgba(0,0,0,0.12);transform:scale(1.03)}
+    .person[data-name="Lisa"]{background:var(--green)}.person[data-name="Wasja"]{background:var(--blue)}
+    .person[data-name="Hanna"]{background:var(--red)}.person[data-name="Ella"]{background:var(--purple)}
+    .person[data-name="Alle"]{background:linear-gradient(45deg,var(--green) 0%,var(--blue)33%,var(--red)66%,var(--purple)100%)}
+
+    .content{display:flex;gap:12px;margin-top:10px;padding:12px 12px 40px;align-items:flex-start}
+    #task-sidebar{width:260px;background:var(--sidebar);color:#fff;padding:14px;border-radius:12px;height:calc(100vh - 200px);overflow:auto;box-shadow:0 4px 10px rgba(0,0,0,0.12)}
+    #task-sidebar h3{margin:0 0 8px 0}
+    .task{background:var(--task);color:#fff;padding:8px;border-radius:10px;margin:6px 0;cursor:grab;font-weight:700}
+
+    #calendar-box{flex:1;background:var(--card-bg);padding:14px;border-radius:16px;box-shadow:0 6px 16px rgba(0,0,0,0.12);min-width:0}
+    #calendar-header{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:8px}
+    #calendar-header button{background:var(--green);color:#fff;border:none;padding:6px 10px;border-radius:8px;cursor:pointer}
+    #weekday-row{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-weight:700;color:#555;margin-bottom:8px}
+    #calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
+    .day{background:#fafafa;border-radius:12px;padding:8px;min-height:110px;border:1px solid #eee;display:flex;flex-direction:column;overflow:hidden}
+    .day.today{background:var(--today)}
+    .date-label{font-weight:700;margin-bottom:6px;font-size:0.85rem}
+    .assignment{color:#fff;padding:6px;border-radius:10px;margin:4px 0;font-size:0.9rem;box-shadow:0 2px 6px rgba(0,0,0,0.12)}
+    .assignment.Lisa{background:var(--green)}.assignment.Wasja{background:var(--blue)}
+    .assignment.Hanna{background:var(--red)}.assignment.Ella{background:var(--purple)}
+    .assignment.Alle{background:linear-gradient(45deg,var(--green)0%,var(--blue)33%,var(--red)66%,var(--purple)100%)}
+
+    #add-task-box{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    #newTaskInput{padding:8px;border-radius:8px;border:none;width:100%}
+    .btn-add{background:var(--green);color:#fff;padding:10px;border-radius:10px;border:none;font-weight:800;cursor:pointer}
+
+    #contextMenu{position:absolute;display:none;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);z-index:1000;min-width:200px}
+    #contextMenu ul{list-style:none;margin:0;padding:6px 0}
+    #contextMenu li{padding:8px 14px;cursor:pointer;font-weight:700}
+    #contextMenu li:hover{background:#f6f6f6}
+
+    @media (max-width:900px){#task-sidebar{display:none}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="left-controls">
+      <button class="header-btn" onclick="exportICS()">📤 Export</button>
+      <input type="file" id="importFile" style="display:none" accept=".ics,text/calendar" onchange="importICS(event)" />
+      <button class="header-btn" onclick="document.getElementById('importFile').click()">📥 Import</button>
+    </div>
+    <h1>Haushaltskalender</h1>
+    <div class="top-controls"><div id="trash" title="Zum Löschen hierher ziehen">🗑️</div></div>
+  </header>
+
+  <div class="person-bar-wrap"><div id="person-bar" role="tablist" aria-label="Personen">
+    <div class="person" data-name="Lisa" onclick="selectPerson('Lisa')">Lisa</div>
+    <div class="person" data-name="Wasja" onclick="selectPerson('Wasja')">Wasja</div>
+    <div class="person" data-name="Hanna" onclick="selectPerson('Hanna')">Hanna</div>
+    <div class="person" data-name="Ella" onclick="selectPerson('Ella')">Ella</div>
+    <div class="person" data-name="Alle" onclick="selectPerson('Alle')">Alle</div>
+  </div></div>
+
+  <div class="content">
+    <aside id="task-sidebar" aria-label="Aufgaben">
+      <h3>Aufgaben</h3>
+      <div id="task-pool"></div>
+      <div id="add-task-box">
+        <label style="font-weight:800"><input type="checkbox" id="repeatWeekly"> wöchentlich wiederholen</label>
+        <input type="text" id="newTaskInput" placeholder="Neue Aufgabe">
+        <button class="btn-add" onclick="addTask()">+ Aufgabe hinzufügen</button>
+      </div>
+    </aside>
+
+    <main id="calendar-box" role="application" aria-label="Kalender">
+      <div id="calendar-header">
+        <button onclick="prevMonth()">‹</button>
+        <span id="monthYear" aria-live="polite"></span>
+        <button onclick="nextMonth()">›</button>
+      </div>
+      <div id="weekday-row"><div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div></div>
+      <div id="calendar"></div>
+    </main>
+  </div>
+
+  <div id="contextMenu" role="menu" aria-hidden="true">
+    <ul>
+      <li onclick="deleteSingle()">Diesen Eintrag löschen</li>
+      <li onclick="deleteAllWeekly()">Alle wiederkehrenden Einträge löschen</li>
+    </ul>
+  </div>
+
+<script>
+// --- State ---
+let currentMonth,currentYear;
+let selectedPerson = null;
+const PERSONS = ['Lisa','Wasja','Hanna','Ella','Alle'];
+let tasks = JSON.parse(localStorage.getItem('tasks')) || [
+  "Geschirrspüler ausräumen","Staubsaugen Wohnzimmer","Bad putzen","Müll rausbringen","Wäsche zusammenlegen","Einkaufsliste schreiben"
+];
+let assignments = JSON.parse(localStorage.getItem('assignments')) || {};
+let savedState = JSON.parse(localStorage.getItem('calendarState')) || {};
+if (savedState.month!==undefined){currentMonth=savedState.month; currentYear=savedState.year;}
+else { let now=new Date(); currentMonth=now.getMonth(); currentYear=now.getFullYear(); }
+
+// --- Persistence ---
+function saveState(){ localStorage.setItem('tasks',JSON.stringify(tasks)); localStorage.setItem('assignments',JSON.stringify(assignments)); localStorage.setItem('calendarState',JSON.stringify({month:currentMonth,year:currentYear})); }
+
+// --- Tasks UI ---
+function addTask(){ let input=document.getElementById('newTaskInput'); let v=input.value.trim(); if(v){ tasks.push(v); input.value=''; renderTasks(); saveState(); } }
+function renderTasks(){ let pool=document.getElementById('task-pool'); pool.innerHTML=''; tasks.forEach(task=>{ let d=document.createElement('div'); d.className='task'; d.draggable=true; d.textContent=task; d.title='Aufgabe ziehen oder klicken um zuzuweisen'; d.addEventListener('dragstart',e=>e.dataTransfer.setData('text/task',task)); d.addEventListener('click',()=>assignToSelected(task)); pool.appendChild(d); }); }
+
+// --- Calendar ---
+function renderCalendar(){
+  let monthYear=document.getElementById('monthYear'); let cal=document.getElementById('calendar');
+  monthYear.textContent = new Date(currentYear,currentMonth).toLocaleString('de-DE',{month:'long',year:'numeric'});
+  cal.innerHTML='';
+  let firstDay=new Date(currentYear,currentMonth,1).getDay(); if(firstDay===0) firstDay=7;
+  let daysInMonth=new Date(currentYear,currentMonth+1,0).getDate(); let today=new Date();
+  for(let i=1;i<firstDay;i++){ cal.appendChild(document.createElement('div')); }
+  for(let d=1; d<=daysInMonth; d++){
+    let cell=document.createElement('div'); cell.className='day';
+    if(d===today.getDate() && currentMonth===today.getMonth() && currentYear===today.getFullYear()) cell.classList.add('today');
+    let key=`${d}.${currentMonth+1}.${currentYear}`; cell.dataset.date=key;
+    let lbl=document.createElement('div'); lbl.className='date-label'; lbl.textContent=key; cell.appendChild(lbl);
+    cell.ondragover = e=>e.preventDefault();
+    cell.ondrop = e=>{ let task=e.dataTransfer.getData('text/task'); if(task) addAssignment(key,task); };
+    // render assignments including weekly repeats
+    for(let base in assignments){
+      assignments[base].forEach(a=>{
+        let [bd,bm,by]=base.split('.').map(Number);
+        let baseDate=new Date(by,bm-1,bd); let curDate=new Date(currentYear,currentMonth,d);
+        let diff=Math.floor((curDate-baseDate)/(1000*60*60*24));
+        if(diff>=0 && (a.repeat==='weekly' ? diff%7===0 : diff===0)){
+          let div=document.createElement('div'); div.className='assignment '+(a.person||''); div.textContent=a.task;
+          div.draggable=true;
+          div.addEventListener('dragstart',e=>e.dataTransfer.setData('text/assignment',JSON.stringify({date:base,task:a.task,person:a.person})));
+          div.addEventListener('contextmenu',e=>{ e.preventDefault(); contextTarget={date:base,task:a.task,person:a.person,repeat:a.repeat}; showContextMenu(e.pageX,e.pageY); });
+          cell.appendChild(div);
+        }
+      });
+    }
+    cal.appendChild(cell);
+  }
+}
+
+// --- Assignments ---
+function addAssignment(date,task){
+  if(!task) return;
+  if(!assignments[date]) assignments[date]=[];
+  let repeatWeekly = document.getElementById('repeatWeekly').checked;
+  assignments[date].push({task:task,person:selectedPerson,repeat: repeatWeekly ? 'weekly' : null});
+  saveState(); renderCalendar();
+}
+
+// --- Person selection ---
+function selectPerson(name){ selectedPerson=name; document.querySelectorAll('.person').forEach(p=>p.classList.remove('selected')); let el=document.querySelector('.person[data-name="'+name+'"]'); if(el) el.classList.add('selected'); }
+window.selectPerson = selectPerson;
+
+// --- Month navigation ---
+function prevMonth(){ currentMonth--; if(currentMonth<0){currentMonth=11;currentYear--;} saveState(); renderCalendar(); }
+function nextMonth(){ currentMonth++; if(currentMonth>11){currentMonth=0;currentYear++;} saveState(); renderCalendar(); }
+window.prevMonth = prevMonth; window.nextMonth = nextMonth;
+
+// --- Trash ---
+let trash=document.getElementById('trash');
+trash.ondragover = e=>e.preventDefault();
+trash.ondrop = e=>{
+  let t=e.dataTransfer.getData('text/task');
+  if(t){ tasks = tasks.filter(x=>x!==t); for(let d in assignments) assignments[d]=assignments[d].filter(a=>a.task!==t); saveState(); renderTasks(); renderCalendar(); }
+  let as=e.dataTransfer.getData('text/assignment');
+  if(as){ let a=JSON.parse(as); assignments[a.date]=assignments[a.date].filter(x=>!(x.task===a.task && x.person===a.person)); saveState(); renderCalendar(); }
+}
+
+// --- Context menu ---
+let contextMenu=document.getElementById('contextMenu'); let contextTarget=null;
+function showContextMenu(x,y){ contextMenu.style.display='block'; contextMenu.style.left = x+'px'; contextMenu.style.top = y+'px'; contextMenu.setAttribute('aria-hidden','false'); }
+function closeContextMenu(){ contextMenu.style.display='none'; contextMenu.setAttribute('aria-hidden','true'); contextTarget=null; }
+window.addEventListener('click', e=>{ if(!contextMenu.contains(e.target)) closeContextMenu(); });
+window.addEventListener('keydown', e=>{ if(e.key==='Escape') closeContextMenu(); });
+
+function deleteSingle(){ if(!contextTarget) return; assignments[contextTarget.date] = assignments[contextTarget.date].filter(a=>!(a.task===contextTarget.task && a.person===contextTarget.person)); saveState(); renderCalendar(); closeContextMenu(); }
+function deleteAllWeekly(){ if(!contextTarget) return; for(let d in assignments) assignments[d] = assignments[d].filter(a=>!(a.task===contextTarget.task && a.person===contextTarget.person)); saveState(); renderCalendar(); closeContextMenu(); }
+window.deleteSingle = deleteSingle; window.deleteAllWeekly = deleteAllWeekly;
+
+// --- ICS Export/Import with CATEGORIES ---
+function pad(n){return String(n).padStart(2,'0');}
+function formatDateForICS(date){ return date.getFullYear()+pad(date.getMonth()+1)+pad(date.getDate()); }
+function nowStamp(){ return new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
+function esc(s){ return (s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+
+function exportICS(){
+  let header = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Haushaltskalender//DE\r\n";
+  let body = "";
+  for(let base in assignments){
+    assignments[base].forEach(a=>{
+      let [bd,bm,by]=base.split('.').map(Number);
+      let dt = new Date(by,bm-1,bd);
+      let dtstart = formatDateForICS(dt);
+      let dtstamp = nowStamp();
+      let uid = encodeURIComponent(a.task+'-'+base+'-'+(a.person||''));
+      let summary = a.task + (a.person ? ' ('+a.person+')' : '');
+      body += "BEGIN:VEVENT\r\n";
+      body += "UID:"+uid+"\r\n";
+      body += "DTSTAMP:"+dtstamp+"\r\n";
+      body += "DTSTART;VALUE=DATE:"+dtstart+"\r\n";
+      if(a.repeat==='weekly') body += "RRULE:FREQ=WEEKLY\r\n";
+      body += "SUMMARY:"+esc(summary)+"\r\n";
+      if(a.person) body += "CATEGORIES:"+a.person+"\r\n";
+      body += "END:VEVENT\r\n";
+    });
+  }
+  let footer = "END:VCALENDAR";
+  let ics = header+body+footer;
+  let blob = new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  let url = URL.createObjectURL(blob);
+  let link = document.createElement('a'); link.href=url; link.download='haushaltskalender_export.ics'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+}
+
+function importICS(event){
+  let file = event.target.files && event.target.files[0]; if(!file) return;
+  let reader = new FileReader();
+  reader.onload = function(e){ parseICS(e.target.result); renderTasks(); renderCalendar(); saveState(); event.target.value=''; }
+  reader.readAsText(file);
+}
+
+function parseICS(text){
+  let blocks = text.split(/END:VEVENT/i);
+  blocks.forEach(block=>{
+    if(!/BEGIN:VEVENT/i.test(block)) return;
+    let dtMatch = block.match(/DTSTART(?:;VALUE=DATE)?:?([0-9T]+)/i);
+    if(!dtMatch) return;
+    let raw = dtMatch[1].trim();
+    let y = parseInt(raw.substr(0,4)), m = parseInt(raw.substr(4,2)), d = parseInt(raw.substr(6,2));
+    let dt = new Date(y,m-1,d);
+    let sumMatch = block.match(/SUMMARY:(.+)/i);
+    let summary = sumMatch ? sumMatch[1].trim().replace(/\r?\n\s+/g,' ') : 'Aufgabe';
+    summary = summary.replace(/\\,/g,',').replace(/\\n/g,'\n').replace(/\\;/g,';').replace(/\\\\/g,'\\');
+    let repeat = /RRULE:.*FREQ=WEEKLY/i.test(block) ? 'weekly' : null;
+    // attempt to find person: first CATEGORIES, then parentheses in SUMMARY
+    let person = null;
+    let catMatch = block.match(/CATEGORIES:([^\r\n]+)/i);
+    if(catMatch){ let cand = catMatch[1].trim(); if(PERSONS.includes(cand)) person = cand; }
+    if(!person){
+      let mSum = summary.match(/^(.*)\s+\(([^()]+)\)\s*$/);
+      if(mSum){ let cand = mSum[2].trim(); if(PERSONS.includes(cand)) person = cand; summary = mSum[1].trim(); }
+    }
+    let taskTitle = summary;
+    if(!tasks.includes(taskTitle)) tasks.push(taskTitle);
+    let key = `${dt.getDate()}.${dt.getMonth()+1}.${dt.getFullYear()}`;
+    if(!assignments[key]) assignments[key]=[];
+    assignments[key].push({task:taskTitle, person:person, repeat:repeat});
+  });
+}
+
+// --- Init ---
+renderTasks();
+renderCalendar();
+window.exportICS = exportICS;
+window.importICS = importICS;
+window.importICS = importICS; // expose
+window.addTask = addTask;
+
+// save on unload
+window.addEventListener('beforeunload', saveState);
+</script>
+</body>
+</html>
